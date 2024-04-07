@@ -15,8 +15,9 @@ from collections import deque
 import pandas as pd
 import shinywidgets
 import shiny 
-
+import plotly.express as px
 from faicons import icon_svg  
+from shinywidgets import render_plotly, render_widget
 
 
 # --------------------------------------------
@@ -29,7 +30,7 @@ from faicons import icon_svg
 # Use a type hint to make it clear that it's an integer (: int)
 # --------------------------------------------
 
-UPDATE_INTERVAL_SECS: int = 1
+UPDATE_INTERVAL_SECS: int = 15
 
 # --------------------------------------------
 # Initialize a REACTIVE VALUE with a common data structure
@@ -38,7 +39,7 @@ UPDATE_INTERVAL_SECS: int = 1
 # This reactive value is a wrapper around a DEQUE of readings
 # --------------------------------------------
 
-DEQUE_SIZE: int = 5
+DEQUE_SIZE: int = 15
 reactive_value_wrapper = reactive.value(deque(maxlen=DEQUE_SIZE))
 
 
@@ -57,7 +58,7 @@ def reactive_calc_combined():
     reactive.invalidate_later(UPDATE_INTERVAL_SECS)
 
     # Data generation logic
-    temp = round(random.uniform(-18, -16), 1)
+    temp = round(random.uniform(50, 80), 0)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     new_dictionary_entry = {"temp":temp, "timestamp":timestamp}
 
@@ -92,9 +93,9 @@ ui.page_opts(title="PyShiny Express: Live Data With Value Card", fillable=True)
 
 with ui.sidebar(open="open"):
   with ui.card(style="background-color: #90EE90"):
-      ui.h2("Antarctic Explorer", class_="text-center")
+      ui.h2("Weather Explorer", class_="text-center")
   ui.p(
-        "A demonstration of real-time temperature readings in Antarctica.",
+        "A demonstration of real-time temperature readings in Iowa",
         class_="text-center",
     )
   ui.hr()
@@ -115,23 +116,24 @@ with ui.sidebar(open="open"):
 
 with ui.layout_columns():
     with ui.value_box(
-        showcase=icon_svg("sun"),
-        theme="bg-gradient-blue-purple",
+        showcase=icon_svg("umbrella"),
+        theme="bg-gradient-green-yellow",
     ):
 
         "Current Temperature"
+
 
         @render.text
         def display_temp():
             """Get the latest reading and return a temperature string"""
             deque_snapshot, df, latest_dictionary_entry = reactive_calc_combined()
-            return f"{latest_dictionary_entry['temp']} C"
+            return f"{latest_dictionary_entry['temp']} F"
 
-        "warmer than usual"
+        "Don't forget your sunscreen"
 
   
 
-    with ui.card(full_screen=True):
+    with ui.card(style="width:100%; height: 250px;"):
         ui.card_header("Current Date and Time")
 
         @render.text
@@ -142,13 +144,33 @@ with ui.layout_columns():
 
 
 with ui.layout_columns():
-    with ui.card():
-        ui.card_header("Current Data (placeholder only)")
+    with ui.card(style="width: 50%; height: 500px;"):
+        ui.card_header("15 Most Recent Temperature Readings")
+        
+        @render.data_frame
+        def display_df():
+            """Get the latest reading and return a dataframe with current readings"""
+            deque_snapshot, df, latest_dictionary_entry = reactive_calc_combined()
+            pd.set_option('display.width', None)        # Use maximum width
+            return render.DataGrid( df,width="100%")
 
 with ui.layout_columns():
-    with ui.card():
-        ui.card_header("Current Chart (placeholder only)")
+    with ui.card(style="width: 50%; height: 500px;"):
+        ui.card_header("Scatter Plot with 15 Most Recent Time/Temp Readings")
 
+        @render_plotly 
+        def display_plot():
+            deque_snapshot, df, latest_dictionary_entry = reactive_calc_combined()
+            if not df.empty:
+                fig = px.area(df,
+                x="timestamp",
+                y="temp",
+                labels={"temp": "Temperature (°F)", "timestamp": "Time"},
+                color_discrete_sequence=["green"] )
+                fig.update_yaxes(automargin=True)
+                fig.update_xaxes(automargin=True)
+                return fig
+            
 #Changing the background color
 
 ui.HTML("""
@@ -158,6 +180,8 @@ ui.HTML("""
   }
 </style>
 """)
+
+
 
 
 
